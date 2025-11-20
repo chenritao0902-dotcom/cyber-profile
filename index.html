@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description" content="Netrunner的赛博朋克风格个人技术博客，分享全栈开发与虚拟现实技术心得。">
+
+    <title>NEURAL_LINK // V2.0_OPTIMIZED</title>
+
+    
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+
+
+    <style>
+
+        /* --- 核心变量 --- */
+
+        :root {
+
+            --neon-cyan: #00f3ff;
+
+            --neon-pink: #ff00ff;
+
+            --neon-yellow: #f9f002;
+
+            --bg-color: #050505;
+
+            --panel-bg: rgba(10, 10, 10, 0.85);
+
+            --font-main: 'Share Tech Mono', monospace; /* 字体升级 */
+
+        }
+
+
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+
+
+        body {
+
+            background-color: var(--bg-color);
+
+            color: var(--neon-cyan);
+
+            font-family: var(--font-main);
+
+            overflow: hidden;
+
+            height: 100vh;
+
+            display: flex;
+
+            justify-content: center;
+
+            align-items: center;
+
+            /* 防止移动端点击高亮 */
+
+            -webkit-tap-highlight-color: transparent;
+
+        }
+
+
+
+        /* --- 背景特效层 --- */
+
+        #matrix-canvas {
+
+            position: fixed;
+
+            top: 0; left: 0; width: 100%; height: 100%;
+
+            z-index: -1;
+
+            opacity: 0.15; /* 降低透明度以提升文字可读性 */
+
+            transition: opacity 0.5s;
+
+        }
+
+
+
+        .crt-overlay {
+
+            position: fixed;
+
+            top: 0; left: 0; width: 100vw; height: 100vh;
+
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+
+            background-size: 100% 4px;
+
+            z-index: 998;
+
+            pointer-events: none;
+
+            transition: opacity 0.5s;
+
+        }
+
+
+
+        /* 噪点纹理 (提升质感) */
+
+        .noise-layer {
+
+            position: fixed;
+
+            top: 0; left: 0; width: 100%; height: 100%;
+
+            opacity: 0.05;
+
+            z-index: 997;
+
+            pointer-events: none;
+
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+
+        }
+
+
+
+        /* --- 主容器 (增加鼠标跟随光效) --- */
+
+        .cyber-container {
+
+            width: 80%;
+
+            max-width: 900px;
+
+            height: 80vh;
+
+            background: var(--panel-bg);
+
+            /* 这里使用JS更新 --x 和 --y 实现光照效果 */
+
+            background: radial-gradient(
+
+                600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+
+                rgba(0, 243, 255, 0.06),
+
+                transparent 40%
+
+            ), var(--panel-bg);
+
+            
+
+            border: 1px solid var(--neon-cyan);
+
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.15);
+
+            display: flex;
+
+            flex-direction: column;
+
+            position: relative;
+
+            backdrop-filter: blur(8px);
+
+            transition: width 0.3s, height 0.3s;
+
+            z-index: 1000; /* 确保在遮罩层之上 */
+
+        }
+
+
+
+        /* --- 顶部栏 --- */
+
+        .header {
+
+            padding: 15px 20px;
+
+            border-bottom: 2px solid var(--neon-cyan);
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            background: rgba(0,0,0,0.3);
+
+        }
+
+
+
+        .logo {
+
+            font-size: 2rem;
+
+            letter-spacing: 3px;
+
+            color: #fff;
+
+            text-shadow: 2px 2px var(--neon-pink);
+
+            user-select: none;
+
+        }
+
+
+
+        .header-controls {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 15px;
+
+        }
+
+
+
+        .perf-btn {
+
+            background: transparent;
+
+            border: 1px solid var(--neon-yellow);
+
+            color: var(--neon-yellow);
+
+            padding: 2px 8px;
+
+            font-family: var(--font-main);
+
+            cursor: pointer;
+
+            font-size: 0.7rem;
+
+            opacity: 0.7;
+
+        }
+
+        .perf-btn:hover { opacity: 1; background: var(--neon-yellow); color: #000; }
+
+
+
+        .status {
+
+            font-size: 0.9rem;
+
+            color: var(--neon-yellow);
+
+            text-shadow: 0 0 5px var(--neon-yellow);
+
+        }
+
+
+
+        /* --- 导航栏 --- */
+
+        .nav {
+
+            display: flex;
+
+            border-bottom: 1px solid var(--neon-cyan);
+
+            flex-shrink: 0; /* 防止导航栏被挤压 */
+
+        }
+
+
+
+        .nav-btn {
+
+            flex: 1;
+
+            background: rgba(0, 243, 255, 0.05);
+
+            border: none;
+
+            border-right: 1px solid var(--neon-cyan);
+
+            color: var(--neon-cyan);
+
+            padding: 15px;
+
+            font-family: var(--font-main);
+
+            font-size: 1.1rem;
+
+            cursor: pointer;
+
+            transition: all 0.2s;
+
+        }
+
+
+
+        .nav-btn:hover { background: rgba(0, 243, 255, 0.2); }
+
+        .nav-btn.active {
+
+            background: var(--neon-cyan);
+
+            color: var(--bg-color);
+
+            font-weight: bold;
+
+        }
+
+        .nav-btn:last-child { border-right: none; }
+
+
+
+        /* --- 内容区域 --- */
+
+        .content-area {
+
+            flex: 1;
+
+            padding: 30px;
+
+            overflow-y: auto;
+
+            scroll-behavior: smooth;
+
+        }
+
+
+
+        .section { display: none; animation: fadeIn 0.4s ease-out; }
+
+        .section.active { display: block; }
+
+
+
+        h2 {
+
+            color: var(--neon-pink);
+
+            margin-bottom: 25px;
+
+            border-left: 4px solid var(--neon-yellow);
+
+            padding-left: 15px;
+
+            font-size: 1.5rem;
+
+        }
+
+
+
+        p { line-height: 1.7; margin-bottom: 15px; color: #e0e0e0; }
+
+
+
+        /* 优化后的文章卡片 */
+
+        .blog-post {
+
+            border: 1px solid rgba(0, 243, 255, 0.3);
+
+            padding: 20px;
+
+            margin-bottom: 20px;
+
+            background: rgba(0,0,0,0.4);
+
+            transition: all 0.3s;
+
+            cursor: default;
+
+        }
+
+        
+
+        /* 使用 will-change 优化动画性能 */
+
+        .blog-post:hover {
+
+            border-color: var(--neon-yellow);
+
+            transform: translateX(5px);
+
+            background: rgba(0,0,0,0.6);
+
+            box-shadow: -5px 0 0 var(--neon-pink);
+
+        }
+
+
+
+        /* --- 滚动条美化 --- */
+
+        ::-webkit-scrollbar { width: 6px; }
+
+        ::-webkit-scrollbar-track { background: #050505; }
+
+        ::-webkit-scrollbar-thumb { background: #333; }
+
+        ::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+
+
+
+        /* --- 动画 --- */
+
+        @keyframes fadeIn {
+
+            from { opacity: 0; transform: translateY(10px); }
+
+            to { opacity: 1; transform: translateY(0); }
+
+        }
+
+
+
+        /* --- 低性能模式 (Low Graphics Mode) --- */
+
+        body.low-perf .crt-overlay,
+
+        body.low-perf .noise-layer,
+
+        body.low-perf #matrix-canvas {
+
+            display: none !important;
+
+        }
+
+        
+
+        body.low-perf .cyber-container {
+
+            backdrop-filter: none;
+
+            background: #111;
+
+            box-shadow: none;
+
+            border: 1px solid #444;
+
+        }
+
+        
+
+        body.low-perf .logo { text-shadow: none; }
+
+
+
+        /* --- 移动端适配 (Mobile Optimization) --- */
+
+        @media (max-width: 768px) {
+
+            .cyber-container {
+
+                width: 95%;
+
+                height: 92vh;
+
+                box-shadow: none; /* 减少手机端渲染负担 */
+
+            }
+
+
+
+            .header {
+
+                flex-direction: column;
+
+                gap: 10px;
+
+                text-align: center;
+
+            }
+
+
+
+            .status { display: none; /* 手机端隐藏时间以节省空间 */ }
+
+            
+
+            .nav-btn {
+
+                padding: 12px 5px;
+
+                font-size: 0.9rem;
+
+            }
+
+
+
+            .content-area {
+
+                padding: 20px;
+
+            }
+
+            
+
+            /* 手机端隐藏鼠标跟随效果 */
+
+            .cyber-container {
+
+                background: var(--panel-bg);
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+
+
+    <div class="noise-layer"></div>
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="crt-overlay"></div>
+
+
+
+    <div class="cyber-container" id="container">
+
+        <header class="header">
+
+            <div class="logo">NEURAL_LINK // ADMIN</div>
+
+            <div class="header-controls">
+
+                <div class="status">SYS_TIME: <span id="clock">00:00:00</span></div>
+
+                <button class="perf-btn" id="perf-toggle" onclick="togglePerf()">[GRAPHICS: HIGH]</button>
+
+            </div>
+
+        </header>
+
+
+
+        <nav class="nav">
+
+            <button class="nav-btn active" onclick="switchTab('home', this)">主页_HOME</button>
+
+            <button class="nav-btn" onclick="switchTab('logs', this)">日志_LOGS</button>
+
+            <button class="nav-btn" onclick="switchTab('projects', this)">项目_PROJECTS</button>
+
+        </nav>
+
+
+
+        <main class="content-area">
+
+            <div id="home" class="section active">
+
+                <h2>// IDENTITY_CONFIRMED</h2>
+
+                <p id="typing-text" style="min-height: 3em;"></p> 
+
+                
+
+                <div style="margin-top: 30px; padding: 15px; border: 1px dashed var(--neon-cyan); color: #888;">
+
+                    <p>> 网络连接... 稳定</p>
+
+                    <p>> 神经界面... 已同步</p>
+
+                    <p>> 欢迎访问我的数字前哨站。</p>
+
+                </div>
+
+            </div>
+
+
+
+            <div id="logs" class="section">
+
+                <h2>// ENCRYPTED_DATA</h2>
+
+                <article class="blog-post">
+
+                    <h3 style="color: var(--neon-yellow); margin-bottom:5px;">Entry_042: 性能优化笔记</h3>
+
+                    <small style="color: #666">2025-11-20</small>
+
+                    <p style="margin-top:10px">重构了渲染核心，使用 requestAnimationFrame 替代了旧的定时器，现在电池续航提升了 40%。</p>
+
+                </article>
+
+                <article class="blog-post">
+
+                    <h3 style="color: var(--neon-yellow); margin-bottom:5px;">Entry_041: 虚拟纹理</h3>
+
+                    <small style="color: #666">2025-11-18</small>
+
+                    <p style="margin-top:10px">由于移动设备的限制，我不得不牺牲一部分视觉特效来换取流畅度。</p>
+
+                </article>
+
+            </div>
+
+
+
+            <div id="projects" class="section">
+
+                <h2>// WEAPON_SYSTEMS</h2>
+
+                <article class="blog-post">
+
+                    <h3 style="color: var(--neon-pink)">System: LIGHTHOUSE_FIX</h3>
+
+                    <p>基于 Google 分析工具的自动优化脚本。</p>
+
+                </article>
+
+                <article class="blog-post">
+
+                    <h3 style="color: var(--neon-pink)">System: GHOST_PROTOCOL</h3>
+
+                    <p>隐形浏览框架，保护用户隐私数据。</p>
+
+                </article>
+
+            </div>
+
+        </main>
+
+    </div>
+
+
+
+    <script>
+
+        /* --- 1. 性能优化的 Matrix 动画 --- */
+
+        const canvas = document.getElementById('matrix-canvas');
+
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+
+        let columns;
+
+        const fontSize = 16;
+
+        let rainDrops = [];
+
+        let animationId;
+
+        let isLowPerf = false;
+
+
+
+        function initMatrix() {
+
+            width = canvas.width = window.innerWidth;
+
+            height = canvas.height = window.innerHeight;
+
+            columns = Math.floor(width / fontSize);
+
+            rainDrops = new Array(columns).fill(1);
+
+        }
+
+
+
+        const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポ0123456789';
+
+        const alphabet = katakana + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+
+
+        // 核心优化：使用时间戳控制帧率 (FPS Throttling)
+
+        let lastTime = 0;
+
+        const fps = 24; // 锁定24帧，电影质感且省电
+
+        const nextFrameTime = 1000 / fps;
+
+
+
+        function animate(currentTime) {
+
+            if (isLowPerf) return; // 低性能模式停止渲染
+
+
+
+            animationId = requestAnimationFrame(animate);
+
+            
+
+            const deltaTime = currentTime - lastTime;
+
+            if (deltaTime > nextFrameTime) {
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+
+                ctx.fillRect(0, 0, width, height);
+
+                ctx.fillStyle = '#0F0';
+
+                ctx.font = fontSize + 'px monospace';
+
+
+
+                for(let i = 0; i < rainDrops.length; i++) {
+
+                    const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+
+                    ctx.fillText(text, i*fontSize, rainDrops[i]*fontSize);
+
+                    
+
+                    if(rainDrops[i]*fontSize > height && Math.random() > 0.975){
+
+                        rainDrops[i] = 0;
+
+                    }
+
+                    rainDrops[i]++;
+
+                }
+
+                lastTime = currentTime - (deltaTime % nextFrameTime);
+
+            }
+
+        }
+
+
+
+        /* --- 2. 低性能模式切换 --- */
+
+        const perfBtn = document.getElementById('perf-toggle');
+
+        
+
+        function togglePerf() {
+
+            isLowPerf = !isLowPerf;
+
+            document.body.classList.toggle('low-perf');
+
+            
+
+            if (isLowPerf) {
+
+                cancelAnimationFrame(animationId);
+
+                ctx.clearRect(0, 0, width, height); // 清空画布
+
+                perfBtn.innerText = "[GRAPHICS: LOW]";
+
+                localStorage.setItem('perfMode', 'low');
+
+            } else {
+
+                animate(0);
+
+                perfBtn.innerText = "[GRAPHICS: HIGH]";
+
+                localStorage.setItem('perfMode', 'high');
+
+            }
+
+        }
+
+
+
+        // 初始化检查
+
+        initMatrix();
+
+        // 读取用户偏好
+
+        if(localStorage.getItem('perfMode') === 'low') {
+
+            togglePerf(); 
+
+        } else {
+
+            animate(0);
+
+        }
+
+        
+
+        window.addEventListener('resize', () => {
+
+            initMatrix();
+
+            // 重置后重新填充，避免黑屏
+
+            if(!isLowPerf) {
+
+               ctx.fillStyle = '#000';
+
+               ctx.fillRect(0,0,width, height);
+
+            }
+
+        });
+
+
+
+        /* --- 3. 鼠标光照效果 --- */
+
+        const container = document.getElementById('container');
+
+        document.addEventListener('mousemove', (e) => {
+
+            if(window.innerWidth > 768 && !isLowPerf) { // 仅在桌面端且高性能模式下启用
+
+                const rect = container.getBoundingClientRect();
+
+                const x = e.clientX - rect.left;
+
+                const y = e.clientY - rect.top;
+
+                container.style.setProperty('--mouse-x', `${x}px`);
+
+                container.style.setProperty('--mouse-y', `${y}px`);
+
+            }
+
+        });
+
+
+
+        /* --- 4. 智能打字机 (带记忆功能) --- */
+
+        const text = "系统: 检测到访客... 正在解密个人档案... 加载完成。我是你的数字向导。";
+
+        const typeEl = document.getElementById('typing-text');
+
+        
+
+        function typeWriter() {
+
+            // 如果已经看过动画，直接显示文本
+
+            if (localStorage.getItem('introShown') === 'true') {
+
+                typeEl.innerText = text;
+
+                return;
+
+            }
+
+
+
+            let i = 0;
+
+            typeEl.innerHTML = "";
+
+            function typing() {
+
+                if (i < text.length) {
+
+                    typeEl.innerHTML += text.charAt(i);
+
+                    i++;
+
+                    setTimeout(typing, 40);
+
+                } else {
+
+                    // 播放完成后标记为已读
+
+                    localStorage.setItem('introShown', 'true');
+
+                }
+
+            }
+
+            typing();
+
+        }
+
+        typeWriter();
+
+
+
+        /* --- 5. 选项卡切换 --- */
+
+        function switchTab(id, btn) {
+
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById(id).classList.add('active');
+
+            btn.classList.add('active');
+
+        }
+
+
+
+        /* --- 6. 时钟 --- */
+
+        setInterval(() => {
+
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+
+        }, 1000);
+
+
+
+    </script>
+
+</body>
+
+</html>
